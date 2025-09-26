@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <title>マンデルバルブ・ジェネレータ</title>
     <style>
+        /* スタイルはV7.1を維持 */
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 20px;
             background-color: #222;
             color: #ddd;
-            /* UI中央寄せのためのFlex設定 */
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: center; 
             min-height: 100vh;
         }
         h1 {
@@ -24,9 +24,10 @@
             display: flex;
             gap: 20px;
             max-width: 1200px;
-            margin: auto; 
             flex-grow: 1; 
-            align-items: center; /* 垂直方向の中央寄せ */
+            align-items: flex-start;
+            justify-content: center; 
+            flex-wrap: wrap; /* スマホで縦並びにする */
         }
         #controls {
             flex-shrink: 0;
@@ -35,12 +36,16 @@
             background-color: #333;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            max-height: 80vh; 
+            max-height: 90vh; /* 画面に収まるように調整 */
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
         }
         #canvasContainer {
             flex-grow: 1;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
         }
@@ -49,14 +54,12 @@
             cursor: grab;
             display: block;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            /* キャンバスの論理サイズを維持 */
-            width: 800px;
-            height: 450px;
+            touch-action: none; /* タッチイベントのデフォルト動作を無効にする */
         }
         .control-group {
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #444;
+            padding-bottom: 0px;
+            border-bottom: none;
+            margin-bottom: 0px;
         }
         label {
             display: block;
@@ -92,10 +95,37 @@
         button:hover {
             background-color: #666;
         }
+        button:disabled {
+            background-color: #777;
+            cursor: not-allowed;
+            color: #aaa;
+        }
         #resetBtn { background-color: #d9534f; }
         #resetBtn:hover { background-color: #c9302c; }
         #saveImageBtn { background-color: #5cb85c; }
         #saveImageBtn:hover { background-color: #4cae4c; }
+        #renderHighResBtn { background-color: #007bff; }
+        #renderHighResBtn:hover { background-color: #0056b3; }
+        #smoothPaletteBtn { background-color: #20c997; color: #333;}
+        #smoothPaletteBtn:hover { background-color: #1aa079;}
+        .info-text {
+            font-size: 0.8em;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .radio-item {
+            display: flex;
+            align-items: center;
+        }
+        .controls-sub-section {
+            border-bottom: 1px solid #444;
+            padding-bottom: 15px;
+        }
     </style>
     <script src="gl-matrix-min.js"></script>
 </head>
@@ -103,118 +133,140 @@
     <h1>マンデルバルブ・ジェネレータ</h1>
     <div id="container">
         <div id="controls">
-            <h2>安定性/速度設定</h2>
-
-            <div class="control-group">
-                <label>コア精度 (固定):</label>
-                <div style="font-size:0.9em;">
-                    StepFactor: **1.0**<br>
-                    MaxIterations: **200**
+            <div class="controls-sub-section">
+                <div class="control-group">
+                    <label for="maxIterationsSlider">最大イテレーション数:</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="maxIterationsSlider" min="50" max="1000" value="200" step="10">
+                        <span id="maxIterationsValue" class="value-span">200</span>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="control-group">
-                <label for="maxRaySteps">最大レイ追跡回数 (MaxRaySteps):</label>
-                <div class="slider-wrapper">
-                    <input type="range" id="maxRaySteps" min="100" max="3000" value="1400" step="100">
-                    <span id="maxRayStepsValue" class="value-span">1400</span>
+                <div class="control-group">
+                    <label>最大レイ追跡回数 (固定):</label>
+                    <div style="font-size:0.9em; font-weight: bold; color: #8f8;">1400</div>
                 </div>
             </div>
 
-            <h2>描画設定</h2>
-            
-            <div class="control-group">
-                <label for="powerSelect">マンデルバルブの累乗:</label>
-                <select id="powerSelect">
-                    <option value="8.0" selected>Power 8.0 (標準)</option>
-                    <option value="2.0">Power 2.0</option>
-                    <option value="3.0">Power 3.0</option>
-                    <option value="4.0">Power 4.0</option>
-                    <option value="5.0">Power 5.0</option>
-                    <option value="6.0">Power 6.0</option>
-                    <option value="7.0">Power 7.0</option>
-                    <option value="9.0">Power 9.0</option>
-                    <option value="10.0">Power 10.0</option>
-                    <option value="-8.0">Power -8.0 (反転)</option>
-                </select>
-            </div>
-            
-            <div class="control-group">
-                <label for="fovSlider">視野角 (FOV):</label>
-                <div class="slider-wrapper">
-                    <input type="range" id="fovSlider" min="10" max="150" value="45" step="1">
-                    <span id="fovValue" class="value-span">45°</span>
+            <div class="controls-sub-section">
+                <div class="control-group">
+                    <label for="powerSelect">マンデルバルブの累乗:</label>
+                    <select id="powerSelect">
+                        <option value="2.0">Power 2.0</option>
+                        <option value="3.0">Power 3.0</option>
+                        <option value="1.5">Power 1.5</option>
+                        <option value="2.5">Power 2.5</option>
+                        <option value="4.0">Power 4.0</option>
+                        <option value="5.0">Power 5.0</option>
+                        <option value="6.0">Power 6.0</option>
+                        <option value="7.0">Power 7.0</option>
+                        <option value="8.0" selected>Power 8.0</option>
+                        <option value="9.0">Power 9.0</option>
+                        <option value="10.0">Power 10.0</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="fovSlider">視野角 (FOV):</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="fovSlider" min="10" max="150" value="45" step="1">
+                        <span id="fovValue" class="value-span">45°</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="maxDistance">最大描画距離:</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="maxDistance" min="1.0" max="20.0" value="5.0" step="0.1">
+                        <span id="maxDistanceValue" class="value-span">5.0</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="lightAngle">光源の角度:</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="lightAngle" min="0" max="360" value="30" step="1">
+                        <span id="lightAngleValue" class="value-span">30°</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>色付けモード:</label>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" id="mode_iteration" name="colorMode" value="0">
+                            <label for="mode_iteration">発散グラデーション</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="mode_distance" name="colorMode" value="1" checked>
+                            <label for="mode_distance">距離グラデーション</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="mode_xaxis" name="colorMode" value="2">
+                            <label for="mode_xaxis">X軸グラデーション</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label for="colorPalette">カラーパレット:</label>
+                    <select id="colorPalette">
+                        <option value="rainbow" selected>虹色 (Rainbow)</option>
+                        <option value="fixed_two_color">表面と内面の2色</option>
+                        <option value="grayscale">モノクロ (Grayscale)</option>
+                        <option value="random_smooth">スムースランダム</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="colorStepsSlider">階調数:</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="colorStepsSlider" min="10" max="200" value="200" step="1">
+                        <span id="colorStepsValue" class="value-span">200</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <button id="smoothPaletteBtn">スムースランダムをシャッフル</button>
                 </div>
             </div>
 
-            <div class="control-group">
-                <label for="maxDistance">最大描画距離:</label>
-                <div class="slider-wrapper">
-                    <input type="range" id="maxDistance" min="1.0" max="20.0" value="5.0" step="0.1">
-                    <span id="maxDistanceValue" class="value-span">5.0</span>
+            <div class="controls-sub-section">
+                <div class="control-group">
+                    <label for="highResScale">高画質出力 倍率:</label>
+                    <select id="highResScale">
+                        <option value="2">2倍 (1600x900)</option>
+                        <option value="4">4倍 (3200x1800)</option>
+                        <option value="8">8倍 (6400x3600)</option>
+                    </select>
+                    <button id="renderHighResBtn">高画質レンダリングを実行</button>
+                    <div class="info-text" id="highResStatus"></div>
                 </div>
-            </div>
-
-            <div class="control-group">
-                <label for="lightAngle">光源の角度:</label>
-                <div class="slider-wrapper">
-                    <input type="range" id="lightAngle" min="0" max="360" value="30" step="1">
-                    <span id="lightAngleValue" class="value-span">30°</span>
+                <div class="control-group">
+                    <button id="saveImageBtn">PNGで画像を保存</button>
                 </div>
-            </div>
-
-            <div class="control-group">
-                <label for="colorPalette">カラーパレット:</label>
-                <select id="colorPalette">
-                    <option value="fixed_two_color" selected>二色塗り分け (構造強調)</option>
-                    <option value="rainbow">虹色 (Rainbow)</option>
-                    <option value="grayscale">モノクロ (Grayscale)</option>
-                    <option value="fire">炎 (Fire)</option>
-                    <option value="sea">海 (Sea)</option>
-                    <option value="forest">森 (Forest)</option>
-                    <option value="sunset">夕焼け (Sunset)</option>
-                    <option value="desert">砂漠 (Desert)</option>
-                    <option value="aurora">オーロラ (Aurora)</option>
-                    <option value="space">宇宙 (Space)</option>
-                    <option value="candy">キャンディ (Candy)</option>
-                    <option value="sepia">セピア (Sepia)</option>
-                    <option value="cyberpunk">サイバーパンク (Cyberpunk)</option>
-                    <option value="toxic">有毒 (Toxic)</option>
-                    <option value="electric">電気 (Electric)</option>
-                    <option value="random1">ランダム (グラデーション)</option>
-                    <option value="random">ランダム (ノイズ)</option>
-                </select>
-            </div>
-            
-            <div class="control-group">
-                <label for="paletteSteps">パレットの繰り返し回数:</label>
-                <div class="slider-wrapper">
-                    <input type="range" id="paletteSteps" min="1" max="10" value="2" step="1">
-                    <span id="paletteStepsValue" class="value-span">2</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <button id="resetBtn">カメラ位置をリセット</button>
-                <button id="saveImageBtn">PNGで画像を保存</button>
             </div>
         </div>
         
         <div id="canvasContainer">
-            <canvas id="mandelbrotCanvas"></canvas>
+            <canvas id="mandelbrotCanvas" width="800" height="450"></canvas>
+            <button id="resetBtn" style="margin-top: 10px;">カメラ位置をリセット</button>
+            <div class="info-text" style="text-align: center; margin-top: 10px;">
+                **PC操作:**<br>
+                ドラッグ: 回転<br>
+                ホイール: 拡大縮小<br>
+                Shift + ドラッグ: 平行移動<br><br>
+                **スマホ操作:**<br>
+                1本指ドラッグ: 回転<br>
+                2本指ピンチ: 拡大縮小<br>
+                2本指ドラッグ: 平行移動
+            </div>
         </div>
     </div>
 
+    <script src="gl-matrix-min.js"></script>
     <script>
 // gl-matrixライブラリが読み込まれている前提
 document.addEventListener('DOMContentLoaded', () => {
     // ------------------------------------
-    // --- WebGLセットアップ関数 --- (省略なし)
+    // --- WebGLセットアップ関数 ---
     // ------------------------------------
     function setupWebGL(canvas) {
         if (!canvas) return null;
-        // alpha: falseで透過を防ぎ、パフォーマンスを向上
-        const gl = canvas.getContext('webgl', { alpha: false }) || canvas.getContext('experimental-webgl', { alpha: false });
+        const gl = canvas.getContext('webgl', { alpha: false, preserveDrawingBuffer: true }) || 
+                   canvas.getContext('experimental-webgl', { alpha: false, preserveDrawingBuffer: true });
         if (!gl) { alert("お使いのブラウザはWebGLをサポートしていません。"); return null; }
         return gl;
     }
@@ -236,18 +288,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM要素の取得 ---
     const powerSelect = document.getElementById('powerSelect');
     const colorPaletteSelect = document.getElementById('colorPalette');
-    const paletteStepsSlider = document.getElementById('paletteSteps');
-    const paletteStepsValueSpan = document.getElementById('paletteStepsValue');
-    const maxRayStepsSlider = document.getElementById('maxRaySteps');
-    const maxRayStepsValueSpan = document.getElementById('maxRayStepsValue');
+    const maxIterationsSlider = document.getElementById('maxIterationsSlider');
+    const maxIterationsValueSpan = document.getElementById('maxIterationsValue');
+    const colorStepsSlider = document.getElementById('colorStepsSlider'); 
+    const colorStepsValueSpan = document.getElementById('colorStepsValue'); 
     const lightAngleSlider = document.getElementById('lightAngle');
-    const lightAngleValueSpan = document.getElementById('lightAngleValue');
     const fovSlider = document.getElementById('fovSlider');
-    const fovValueSpan = document.getElementById('fovValue');
     const maxDistanceSlider = document.getElementById('maxDistance');
-    const maxDistanceValueSpan = document.getElementById('maxDistanceValue');
     const resetBtn = document.getElementById('resetBtn');
     const saveImageBtn = document.getElementById('saveImageBtn');
+    const renderHighResBtn = document.getElementById('renderHighResBtn');
+    const highResScaleSelect = document.getElementById('highResScale');
+    const highResStatusDiv = document.getElementById('highResStatus');
+    const smoothPaletteBtn = document.getElementById('smoothPaletteBtn');
+    const colorModeRadios = document.querySelectorAll('input[name="colorMode"]');
+    
+    // UIの初期状態を設定
+    saveImageBtn.disabled = true;
 
     const gl = setupWebGL(canvas);
 
@@ -255,17 +312,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- 解像度と描画設定 ---
         const LOGICAL_WIDTH = 800;
         const LOGICAL_HEIGHT = 450;
-        const PREVIEW_WIDTH = LOGICAL_WIDTH / 2; // 400
-        const PREVIEW_HEIGHT = LOGICAL_HEIGHT / 2; // 225
+        const PREVIEW_DIVISOR = 4; 
+        const PREVIEW_WIDTH = LOGICAL_WIDTH / PREVIEW_DIVISOR; 
+        const PREVIEW_HEIGHT = LOGICAL_HEIGHT / PREVIEW_DIVISOR; 
+        const PALETTE_SIZE = 256.0; 
         
-        // WebGLキャンバスの内部解像度を設定
-        canvas.width = LOGICAL_WIDTH;
-        canvas.height = LOGICAL_HEIGHT;
-        
-        // --- コア設定 ---
+        // --- コア設定 (固定値) ---
         const FIXED_STEP_FACTOR = 1.0;
-        const HIGH_MAX_ITERATIONS = 200;
-        const LOW_MAX_ITERATIONS = 50; 
+        const FIXED_MAX_RAY_STEPS = 1400; 
         
         // --- Uniform変数とカメラの状態 ---
         let cameraPosition = vec3.fromValues(0, 0, 4);
@@ -274,77 +328,75 @@ document.addEventListener('DOMContentLoaded', () => {
         let cameraDistance = 4; 
         
         let currentFOV = parseInt(fovSlider.value);
-        let currentMaxRaySteps = parseInt(maxRayStepsSlider.value);
+        let currentMaxIterations = parseInt(maxIterationsSlider.value);
+        let currentColorSteps = parseInt(colorStepsSlider.value); 
         let isDragging = false;
         let isPanning = false;
+        let renderTimer = null;
+        let lastRenderTime = 0;
+        const THROTTLE_INTERVAL = 200; 
         let lastMouseX = 0;
         let lastMouseY = 0;
-        let renderTimer = null;
         
+        // タッチ操作用
+        let isTouchDragging = false;
+        let initialPinchDistance = -1;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        let lastTouchX2 = 0;
+        let lastTouchY2 = 0;
+        
+        // 高解像度レンダリング用の一時データ保持
+        let highResFBOReference = null;
+        let highResTextureReference = null;
+        let highResScale = 1; 
+        let highResReady = false;
+        
+        // 距離グラデーション用の動的レンジ
+        let minDist = 0.5;
+        let maxDist = 3.0;
+
         const ROTATION_SENSITIVITY = 0.005; 
         const PAN_SENSITIVITY = 0.01;
-        const ZOOM_SENSITIVITY = 0.05;
+        const ZOOM_SENSITIVITY = 0.01;
 
         // ------------------------------------
-        // --- シェーダーコード --- (完全版)
+        // --- シェーダーコード: フラクタル描画用 ---
         // ------------------------------------
-        const vsSource = `
+        const fractalVsSource = `
             attribute vec2 a_position;
             void main() {
                 gl_Position = vec4(a_position, 0.0, 1.0);
             }
         `;
-        const fsSource = `
+        const fractalFsSource = `
             precision highp float;
 
             uniform vec2 u_resolution;
             uniform vec3 u_cameraPosition;
             uniform mat4 u_cameraRotation;
             uniform int u_maxIterations;
-            uniform int u_paletteId;
             uniform float u_power;
-            uniform int u_paletteSteps;
             uniform float u_maxDistance;
             uniform float u_lightAngle;
             uniform float u_focalLength;
             uniform sampler2D u_paletteTexture;
-            
-            // 検証で確定したUniform変数
+            uniform float u_colorSteps; 
             uniform float u_stepFactor;
             uniform int u_maxRaySteps;
+            uniform int u_colorMode; // 0: iteration, 1: distance, 2: x-axis
+            uniform float u_minDist;
+            uniform float u_maxDist;
+            const float PALETTE_SIZE = 256.0;
 
             vec3 hsvToRgb(vec3 c) {
                 vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
                 vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-                return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+                vec3 rgb = c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+                return rgb;
             }
 
-            // --- パレット関数群 ---
-            vec3 grayscalePalette(float t) { return vec3(t); }
-            vec3 rainbowPalette(float t) { return hsvToRgb(vec3(t, 1.0, 1.0)); }
-            vec3 firePalette(float t) {
-                float r, g, b;
-                t = mod(t, 1.0);
-                if (t < 0.25) { r = 0.0; g = t * 4.0; b = 0.0; } 
-                else if (t < 0.5) { r = (t - 0.25) * 4.0; g = 1.0; b = 0.0; } 
-                else if (t < 0.75) { r = 1.0; g = 1.0 - (t - 0.5) * 4.0; b = 0.0; } 
-                else { r = 1.0; g = 0.0; b = (t - 0.75) * 4.0; }
-                return vec3(r, g, b);
-            }
-            vec3 seaPalette(float t) { return mix(vec3(0.0, 0.1, 0.3), vec3(0.5, 0.8, 1.0), t); }
-            vec3 forestPalette(float t) { return mix(vec3(0.0, 0.2, 0.0), vec3(0.6, 0.4, 0.2), t); }
-            vec3 sunsetPalette(float t) { return mix(vec3(0.9, 0.4, 0.0), vec3(0.2, 0.0, 0.4), t); }
-            vec3 desertPalette(float t) { return mix(vec3(0.8, 0.6, 0.3), vec3(0.4, 0.1, 0.0), t); }
-            vec3 auroraPalette(float t) { return hsvToRgb(vec3(t * 0.2 + 0.3, 1.0, 0.8)); }
-            vec3 spacePalette(float t) { return mix(vec3(0.0), vec3(0.8, 0.8, 1.0), pow(t, 3.0)); }
-            vec3 candyPalette(float t) { return mix(vec3(1.0, 0.2, 0.6), vec3(0.4, 0.9, 1.0), t); }
-            vec3 sepiaPalette(float t) { return vec3(t * 0.9, t * 0.8, t * 0.6); }
-            vec3 cyberpunkPalette(float t) { return mix(vec3(0.0, 1.0, 1.0), vec3(1.0, 0.0, 1.0), t); }
-            vec3 toxicPalette(float t) { return mix(vec3(0.0, 0.4, 0.0), vec3(0.4, 1.0, 0.0), t); }
-            vec3 electricPalette(float t) { return mix(vec3(0.0, 0.0, 1.0), vec3(1.0, 0.5, 0.0), t); }
-            // ------------------------------------
-
-
+            // --- mandelbulb関数 ---
             vec2 mandelbulb(vec3 p) {
                 vec3 w = p;
                 float r2 = dot(w, w);
@@ -352,15 +404,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 int n = 0;
                 const float ESCAPE_RADIUS = 2.0;
 
-                for (int i = 0; i < 400; i++) { // Max iteration of 400 in shader for safety
+                for (int i = 0; i < 400; i++) { 
                     if (r2 > ESCAPE_RADIUS * ESCAPE_RADIUS) break;
                     if (i > u_maxIterations) break; 
                     
-                    float r = length(w);
+                    float r = sqrt(r2);
+                    
+                    float powerMinusOne = u_power - 1.0;
+                    dr = pow(r, powerMinusOne) * u_power * dr + 1.0;
+
+                    float rPow = pow(r, u_power); 
+                    
                     float theta = acos(w.z / r) * u_power;
                     float phi = atan(w.y, w.x) * u_power;
-                    dr = pow(r, u_power - 1.0) * u_power * dr + 1.0;
-                    float rPow = pow(r, u_power);
                     
                     w = rPow * vec3(sin(theta) * cos(phi), sin(theta) * sin(phi), cos(theta));
                     w += p;
@@ -381,9 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             void main() {
-                vec2 fragCoord = gl_FragCoord.xy;
-                
-                vec2 uv = (2.0 * fragCoord - u_resolution.xy) / u_resolution.y; 
+                vec2 uv = (2.0 * gl_FragCoord.xy - u_resolution.xy) / u_resolution.y; 
                 
                 vec3 rayDir_local = normalize(vec3(uv.x, uv.y, -u_focalLength));
                 
@@ -395,6 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 vec2 hitInfo;
                 float totalDist = 0.0;
                 vec3 color = vec3(0.0);
+                vec3 hitPoint = vec3(0.0);
 
                 for (int i = 0; i < 3000; i++) { 
                     if (i > u_maxRaySteps) break; 
@@ -415,9 +470,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     totalDist += stepSize;
                     rayPos += rayDir * stepSize;
                 }
+                hitPoint = rayPos;
 
                 if (hitInfo.x < 0.001) {
-                    vec3 normal = calcNormal(rayPos);
+                    vec3 normal = calcNormal(hitPoint);
                     
                     float angle = radians(u_lightAngle);
                     vec3 lightDir = normalize(vec3(sin(angle), 0.5, cos(angle)));
@@ -425,110 +481,161 @@ document.addEventListener('DOMContentLoaded', () => {
                     float diff = max(0.0, dot(normal, lightDir));
                     
                     vec3 baseColor;
+                    float t;
                     
-                    // ID 15: 二色塗り分けパレット (構造強調)
-                    if (u_paletteId == 15) { 
-                        // カメラ位置と衝突位置のフラクタル深度を比較
-                        vec2 camHitInfo = mandelbulb(u_cameraPosition);
-                        float innerThreshold = float(u_maxIterations) * 0.8;
-
-                        if (camHitInfo.y > innerThreshold) {
-                            baseColor = vec3(1.0, 0.2, 0.2); // 赤色
-                        } else {
-                            baseColor = vec3(0.2, 0.4, 1.0); // 青色
-                        }
-                    } else {
-                        // 既存の連続的な色付けロジック (脱出時間ベース)
-                        float t = (log(hitInfo.y) / log(float(u_maxIterations))) * float(u_paletteSteps);
-                        t = fract(t); 
-
-                        // パレット選択
-                        if (u_paletteId == 0) { baseColor = grayscalePalette(t); }
-                        else if (u_paletteId == 1) { baseColor = rainbowPalette(t); }
-                        else if (u_paletteId == 2) { baseColor = firePalette(t); }
-                        else if (u_paletteId == 3) { baseColor = seaPalette(t); }
-                        else if (u_paletteId == 4) { baseColor = forestPalette(t); }
-                        else if (u_paletteId == 5) { baseColor = sunsetPalette(t); }
-                        else if (u_paletteId == 6) { baseColor = desertPalette(t); }
-                        else if (u_paletteId == 7) { baseColor = auroraPalette(t); }
-                        else if (u_paletteId == 8) { baseColor = spacePalette(t); }
-                        else if (u_paletteId == 9) { baseColor = candyPalette(t); }
-                        else if (u_paletteId == 10) { baseColor = sepiaPalette(t); }
-                        else if (u_paletteId == 11) { baseColor = cyberpunkPalette(t); }
-                        else if (u_paletteId == 12) { baseColor = toxicPalette(t); }
-                        else if (u_paletteId == 13) { baseColor = electricPalette(t); }
-                        // ID 14: ランダムパレットテクスチャ
-                        else {
-                            baseColor = texture2D(u_paletteTexture, vec2(t, 0.5)).rgb;
-                        }
+                    if (u_colorMode == 1) { // 距離グラデーション (ワールド原点からの距離)
+                        float worldDistance = length(hitPoint);
+                        t = clamp((worldDistance - u_minDist) / (u_maxDist - u_minDist), 0.0, 1.0);
+                    } else if (u_colorMode == 2) { // X軸グラデーション
+                        t = clamp((hitPoint.x - (-1.5)) / (1.5 - (-1.5)), 0.0, 1.0);
+                    } else { // 発散グラデーション (デフォルト)
+                        float iterRatio = hitInfo.y / float(u_maxIterations);
+                        float colorIndex = floor(iterRatio * u_colorSteps);
+                        t = colorIndex / PALETTE_SIZE;
                     }
-
+                    
+                    baseColor = texture2D(u_paletteTexture, vec2(t, 0.5)).rgb;
+                    
                     color = baseColor * diff + vec3(0.1);
                 } else {
-                    color = vec3(0.0); // 描画失敗時 (真っ黒)
+                    color = vec3(0.0); 
                 }
 
                 gl_FragColor = vec4(color, 1.0);
             }
         `;
+
         // ------------------------------------
+        // --- シェーダーコード: テクスチャ表示用 ---
+        // ------------------------------------
+        const passthroughVsSource = `
+            attribute vec2 a_position;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+                v_texCoord = a_position * 0.5 + 0.5; // [-1, 1] to [0, 1]
+            }
+        `;
+        const passthroughFsSource = `
+            precision highp float;
+            uniform sampler2D u_texture;
+            varying vec2 v_texCoord;
+            void main() {
+                gl_FragColor = texture2D(u_texture, v_texCoord);
+            }
+        `;
 
-        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vsSource);
-        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
-        const program = createProgram(gl, vertexShader, fragmentShader);
-        if (!program) return;
-        gl.useProgram(program);
+        // --- プログラムの作成 ---
+        const fractalVertexShader = createShader(gl, gl.VERTEX_SHADER, fractalVsSource);
+        const fractalFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fractalFsSource);
+        const fractalProgram = createProgram(gl, fractalVertexShader, fractalFragmentShader);
+        if (!fractalProgram) return;
 
-        // --- Uniform Locationの取得 ---
-        const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
-        const cameraPositionLocation = gl.getUniformLocation(program, 'u_cameraPosition');
-        const cameraRotationLocation = gl.getUniformLocation(program, 'u_cameraRotation');
-        const maxIterationsLocation = gl.getUniformLocation(program, 'u_maxIterations');
-        const paletteIdLocation = gl.getUniformLocation(program, 'u_paletteId');
-        const powerLocation = gl.getUniformLocation(program, 'u_power');
-        const paletteStepsLocation = gl.getUniformLocation(program, 'u_paletteSteps');
-        const maxDistanceLocation = gl.getUniformLocation(program, 'u_maxDistance');
-        const lightAngleLocation = gl.getUniformLocation(program, 'u_lightAngle');
-        const focalLengthLocation = gl.getUniformLocation(program, 'u_focalLength');
-        const paletteTextureLocation = gl.getUniformLocation(program, 'u_paletteTexture');
-        const stepFactorLocation = gl.getUniformLocation(program, 'u_stepFactor');
-        const maxRayStepsLocation = gl.getUniformLocation(program, 'u_maxRaySteps');
+        const passthroughVertexShader = createShader(gl, gl.VERTEX_SHADER, passthroughVsSource);
+        const passthroughFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, passthroughFsSource);
+        const passthroughProgram = createProgram(gl, passthroughVertexShader, passthroughFragmentShader);
+        if (!passthroughProgram) return;
 
-        // --- バッファ設定 ---
+        // --- バッファ設定 (共通) ---
         const positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
             -1, -1, 1, -1, -1, 1,
-            -1, 1, 1, -1, 1, 1
+            -1, 1, 1, -1, 1, 1 
         ]), gl.STATIC_DRAW);
-        const positionLocation = gl.getAttribLocation(program, 'a_position');
-        gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
         
-        // --- パレットマップ ---
-        const paletteMap = {
-            'grayscale': 0, 'rainbow': 1, 'fire': 2, 'sea': 3, 'forest': 4,
-            'sunset': 5, 'desert': 6, 'aurora': 7, 'space': 8, 'candy': 9,
-            'sepia': 10, 'cyberpunk': 11, 'toxic': 12, 'electric': 13,
-            'random': 14, 'random1': 14, 
-            'fixed_two_color': 15,
-        };
+        // --- Uniform Locationの取得: Fractal Program ---
+        gl.useProgram(fractalProgram);
+        const fractalPositionLocation = gl.getAttribLocation(fractalProgram, 'a_position');
+        const resolutionLocation = gl.getUniformLocation(fractalProgram, 'u_resolution');
+        const cameraPositionLocation = gl.getUniformLocation(fractalProgram, 'u_cameraPosition');
+        const cameraRotationLocation = gl.getUniformLocation(fractalProgram, 'u_cameraRotation');
+        const maxIterationsLocation = gl.getUniformLocation(fractalProgram, 'u_maxIterations');
+        const powerLocation = gl.getUniformLocation(fractalProgram, 'u_power');
+        const colorStepsLocation = gl.getUniformLocation(fractalProgram, 'u_colorSteps'); 
+        const maxDistanceLocation = gl.getUniformLocation(fractalProgram, 'u_maxDistance');
+        const lightAngleLocation = gl.getUniformLocation(fractalProgram, 'u_lightAngle');
+        const focalLengthLocation = gl.getUniformLocation(fractalProgram, 'u_focalLength');
+        const paletteTextureLocation = gl.getUniformLocation(fractalProgram, 'u_paletteTexture');
+        const stepFactorLocation = gl.getUniformLocation(fractalProgram, 'u_stepFactor');
+        const maxRayStepsLocation = gl.getUniformLocation(fractalProgram, 'u_maxRaySteps');
+        const colorModeLocation = gl.getUniformLocation(fractalProgram, 'u_colorMode');
+        const minDistLocation = gl.getUniformLocation(fractalProgram, 'u_minDist');
+        const maxDistLocation = gl.getUniformLocation(fractalProgram, 'u_maxDist');
+
+
+        // --- Uniform Locationの取得: Passthrough Program ---
+        gl.useProgram(passthroughProgram);
+        const passthroughPositionLocation = gl.getAttribLocation(passthroughProgram, 'a_position');
+        const passthroughTextureLocation = gl.getUniformLocation(passthroughProgram, 'u_texture');
         
-        // --- ランダムパレットテクスチャの準備 ---
+        gl.useProgram(fractalProgram); 
+
+        // --- FBOとテクスチャの準備 ---
+        function createFBO(gl, width, height) {
+            const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            
+            const fbo = gl.createFramebuffer();
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+            // FBOの作成状態をチェック
+            const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status != gl.FRAMEBUFFER_COMPLETE) {
+                console.error("FBO作成失敗:", status);
+                gl.deleteFramebuffer(fbo);
+                gl.deleteTexture(texture);
+                return null;
+            }
+
+            gl.bindTexture(gl.TEXTURE_2D, null);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            return { fbo, texture };
+        }
+        
+        // FBOの内容を画面にコピーする関数 (Passthroughシェーダーを使用)
+        function renderTextureToScreen(texture) {
+            gl.useProgram(passthroughProgram);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null); 
+            
+            // Viewportを論理サイズに戻す
+            gl.viewport(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT); 
+            
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.uniform1i(passthroughTextureLocation, 0); 
+            
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(passthroughPositionLocation, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(passthroughPositionLocation);
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            
+            gl.useProgram(fractalProgram); 
+        }
+
         const randomPaletteTexture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, randomPaletteTexture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        // MIN/MAGフィルタ設定はrender()関数内でLow/Highに応じて切り替えます
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); 
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST); 
 
-        // HSV to RGB (JS用)
-        function hsvToRgb(h, s, v) {
+        // HSV to RGB 変換関数 (JS用)
+        function hsvToRgbJs(h, s, v) {
             let r, g, b;
             const i = Math.floor(h * 6);
             const f = h * 6 - i;
             const p = v * (1 - s);
             const q = v * (1 - f * s);
             const t = v * (1 - (1 - f) * s);
+
             switch (i % 6) {
                 case 0: r = v; g = t; b = p; break;
                 case 1: r = q; g = v; b = p; break;
@@ -537,80 +644,117 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 4: r = t; g = p; b = v; break;
                 case 5: r = v; g = p; b = q; break;
             }
-            return [r * 255, g * 255, b * 255];
+
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
         }
-        
-        // ランダムパレットの生成 (JS用)
-        function generateSmoothRandomPalette() {
-            const palette = new Uint8Array(256 * 4);
-            const numPoints = 10;
-            const points = [];
-            for (let i = 0; i < numPoints; i++) {
-                points.push([Math.random(), Math.random(), Math.random()]);
-            }
-            
-            for (let i = 0; i < 256; i++) {
-                const t = i / 255.0;
-                const index = Math.floor(t * (numPoints - 1));
-                const p1 = points[index];
-                const p2 = points[index + 1];
-                const localT = (t * (numPoints - 1)) - index;
+
+        // 指定した色を滑らかに補間する汎用関数
+        function generateLinearPalette(colors) {
+            const palette = new Uint8Array(PALETTE_SIZE * 4);
+            const numSegments = colors.length - 1;
+            for (let i = 0; i < PALETTE_SIZE; i++) {
+                const t = i / (PALETTE_SIZE - 1);
+                const segmentIndex = Math.floor(t * numSegments);
+                const segmentT = (t * numSegments) - segmentIndex;
                 
-                const r = p1[0] * (1 - localT) + p2[0] * localT;
-                const g = p1[1] * (1 - localT) + p2[1] * localT;
-                const b = p1[2] * (1 - localT) + p2[2] * localT;
+                const c1 = colors[segmentIndex];
+                const c2 = colors[Math.min(segmentIndex + 1, numSegments)];
                 
-                palette[i * 4] = r * 255;
-                palette[i * 4 + 1] = g * 255;
-                palette[i * 4 + 2] = b * 255;
+                const r = c1[0] * (1 - segmentT) + c2[0] * segmentT;
+                const g = c1[1] * (1 - segmentT) + c2[1] * segmentT;
+                const b = c1[2] * (1 - segmentT) + c2[2] * segmentT;
+                
+                palette[i * 4] = Math.round(r);
+                palette[i * 4 + 1] = Math.round(g);
+                palette[i * 4 + 2] = Math.round(b);
                 palette[i * 4 + 3] = 255;
             }
             return palette;
         }
 
-
-        // --- 描画関数 ---
-        function render(quality = 'high') {
+        // プリセットパレットを生成する関数
+        function generatePalette(paletteName) {
+            let paletteData;
+            switch(paletteName) {
+                case 'rainbow':
+                    paletteData = new Uint8Array(PALETTE_SIZE * 4);
+                    for (let i = 0; i < PALETTE_SIZE; i++) {
+                        const h = i / PALETTE_SIZE;
+                        const [r, g, b] = hsvToRgbJs(h, 0.9, 0.9);
+                        paletteData[i * 4] = r;
+                        paletteData[i * 4 + 1] = g;
+                        paletteData[i * 4 + 2] = b;
+                        paletteData[i * 4 + 3] = 255;
+                    }
+                    break;
+                case 'grayscale':
+                    const grayColors = [[0, 0, 0], [255, 255, 255]];
+                    paletteData = generateLinearPalette(grayColors);
+                    break;
+                case 'fixed_two_color':
+                    const twoColors = [[50, 100, 255], [255, 50, 50]];
+                    paletteData = generateLinearPalette(twoColors);
+                    break;
+                case 'random_smooth':
+                    const h1 = Math.random();
+                    const h2 = Math.random();
+                    paletteData = new Uint8Array(PALETTE_SIZE * 4);
+                    for (let i = 0; i < PALETTE_SIZE; i++) {
+                        const t = i / (PALETTE_SIZE - 1);
+                        let h = h1 * (1 - t) + h2 * t;
+                        h = h - Math.floor(h);
+                        const [r, g, b] = hsvToRgbJs(h, 0.8, 0.9);
+                        paletteData[i * 4] = r;
+                        paletteData[i * 4 + 1] = g;
+                        palette[i * 4 + 2] = b;
+                        paletteData[i * 4 + 3] = 255;
+                    }
+                    break;
+                default:
+                    paletteData = new Uint8Array(PALETTE_SIZE * 4);
+                    for (let i = 0; i < PALETTE_SIZE; i++) {
+                        const h = i / PALETTE_SIZE;
+                        const [r, g, b] = hsvToRgbJs(h, 0.9, 0.9);
+                        paletteData[i * 4] = r;
+                        paletteData[i * 4 + 1] = g;
+                        palette[i * 4 + 2] = b;
+                        paletteData[i * 4 + 3] = 255;
+                    }
+                    break;
+            }
+            gl.bindTexture(gl.TEXTURE_2D, randomPaletteTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, PALETTE_SIZE, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, paletteData);
+        }
+        
+        // メインの描画関数
+        function render(quality = 'high', targetFBO = null, targetWidth, targetHeight) {
             const isLow = (quality === 'low');
             
-            // Lowモードの場合、シェーダーに渡す解像度を半分にする
-            const shaderWidth = isLow ? PREVIEW_WIDTH : LOGICAL_WIDTH;
-            const shaderHeight = isLow ? PREVIEW_HEIGHT : LOGICAL_HEIGHT;
+            gl.useProgram(fractalProgram); 
+            gl.bindFramebuffer(gl.FRAMEBUFFER, targetFBO);
             
-            // ★ Lowモード時のビューポートとフィルタリングの調整
+            // Viewportをレンダリング対象の解像度に合わせて設定
+            gl.viewport(0, 0, targetWidth, targetHeight);
+            
+            let maxIterations;
             if (isLow) {
-                 // Low解像度で描画し、全キャンバスサイズに引き伸ばす
-                gl.viewport(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT); 
-                // ピクセルが粗くなるようにNearestフィルタリングを使用
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                maxIterations = Math.max(20, Math.floor(currentMaxIterations / 4));
             } else {
-                // High解像度で描画し、通常のLinearフィルタリングに戻す
-                gl.viewport(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                maxIterations = currentMaxIterations;
             }
-
-            // シェーダー内の解像度を正しく設定
-            gl.uniform2f(resolutionLocation, shaderWidth, shaderHeight);
             
-            const maxIterations = isLow ? LOW_MAX_ITERATIONS : HIGH_MAX_ITERATIONS;
-            const maxRaySteps = currentMaxRaySteps; 
-            
-            // --- Uniform変数の設定 ---
+            gl.uniform2f(resolutionLocation, targetWidth, targetHeight);
             gl.uniform1i(maxIterationsLocation, maxIterations);
-            gl.uniform1i(maxRayStepsLocation, maxRaySteps);
+            gl.uniform1i(maxRayStepsLocation, FIXED_MAX_RAY_STEPS);
             gl.uniform1f(stepFactorLocation, FIXED_STEP_FACTOR); 
-
             gl.uniform3f(cameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+            
             const cameraRotationMatrix = mat4.create();
             mat4.fromQuat(cameraRotationMatrix, cameraRotation);
             gl.uniformMatrix4fv(cameraRotationLocation, false, cameraRotationMatrix);
 
-            const paletteId = paletteMap[colorPaletteSelect.value] || 15;
-            gl.uniform1i(paletteIdLocation, paletteId);
             gl.uniform1f(powerLocation, parseFloat(powerSelect.value));
-            gl.uniform1i(paletteStepsLocation, parseInt(paletteStepsSlider.value));
+            gl.uniform1f(colorStepsLocation, currentColorSteps); 
 
             gl.uniform1f(maxDistanceLocation, parseFloat(maxDistanceSlider.value));
             gl.uniform1f(lightAngleLocation, parseFloat(lightAngleSlider.value));
@@ -618,49 +762,232 @@ document.addEventListener('DOMContentLoaded', () => {
             const focalLength = 1.0 / Math.tan(currentFOV * 0.5 * Math.PI / 180.0);
             gl.uniform1f(focalLengthLocation, focalLength);
 
-            if (colorPaletteSelect.value === 'random' || colorPaletteSelect.value === 'random1') {
-                gl.activeTexture(gl.TEXTURE0);
-                gl.bindTexture(gl.TEXTURE_2D, randomPaletteTexture);
-                gl.uniform1i(paletteTextureLocation, 0);
+            const selectedColorMode = document.querySelector('input[name="colorMode"]:checked').value;
+            gl.uniform1i(colorModeLocation, parseInt(selectedColorMode));
+            
+            if (selectedColorMode === '1') { // 距離グラデーション
+                gl.uniform1f(minDistLocation, minDist);
+                gl.uniform1f(maxDistLocation, maxDist);
             }
 
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, randomPaletteTexture);
+            gl.uniform1i(paletteTextureLocation, 0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(fractalPositionLocation, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(fractalPositionLocation);
+            
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
+
+        // 距離グラデーションのmin/max距離を計算する関数
+        function calculateDistanceRange() {
+            const tempFBO = createFBO(gl, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            if (!tempFBO) return;
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, tempFBO.fbo);
+            gl.viewport(0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+
+            gl.useProgram(fractalProgram);
+            
+            gl.uniform1i(colorModeLocation, 1);
+            gl.uniform2f(resolutionLocation, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            gl.uniform1f(focalLengthLocation, 1.0 / Math.tan(currentFOV * 0.5 * Math.PI / 180.0));
+            gl.uniform3f(cameraPositionLocation, cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+            const cameraRotationMatrix = mat4.create();
+            mat4.fromQuat(cameraRotationMatrix, cameraRotation);
+            gl.uniformMatrix4fv(cameraRotationLocation, false, cameraRotationMatrix);
+
+            gl.uniform1i(maxIterationsLocation, currentMaxIterations);
+            gl.uniform1f(powerLocation, parseFloat(powerSelect.value));
+            gl.uniform1f(maxDistanceLocation, parseFloat(maxDistanceSlider.value));
+            gl.uniform1f(stepFactorLocation, FIXED_STEP_FACTOR);
+            gl.uniform1i(maxRayStepsLocation, FIXED_MAX_RAY_STEPS);
+            gl.uniform1f(lightAngleLocation, 0.0);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(fractalPositionLocation, 2, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(fractalPositionLocation);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+            const pixels = new Float32Array(PREVIEW_WIDTH * PREVIEW_HEIGHT * 4);
+            gl.readPixels(0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT, gl.RGBA, gl.FLOAT, pixels);
+
+            gl.deleteFramebuffer(tempFBO.fbo);
+            gl.deleteTexture(tempFBO.texture);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            
+            let min = Infinity;
+            let max = -Infinity;
+            for (let i = 0; i < pixels.length; i += 4) {
+                const r = pixels[i];
+                const g = pixels[i+1];
+                const b = pixels[i+2];
+                const distance = r*r + g*g + b*b;
+                if (distance > 0.0 && distance < min) min = distance;
+                if (distance > max) max = distance;
+            }
+
+            minDist = Math.sqrt(min);
+            maxDist = Math.sqrt(max);
+
+            if (min === Infinity || max === -Infinity) {
+                minDist = 0.5;
+                maxDist = 3.0;
+            }
+        }
         
+        function renderToHighResAndFlagReady(scale) {
+            highResReady = false;
+            saveImageBtn.disabled = true;
+            renderHighResBtn.disabled = true;
+            highResStatusDiv.textContent = `計算中...`;
+
+            const targetWidth = LOGICAL_WIDTH * scale;
+            const targetHeight = LOGICAL_HEIGHT * scale;
+            
+            // 古いFBOを破棄
+            if (highResFBOReference) {
+                gl.deleteFramebuffer(highResFBOReference.fbo);
+                gl.deleteTexture(highResFBOReference.texture);
+                highResFBOReference = null;
+                highResTextureReference = null;
+            }
+
+            highResFBOReference = createFBO(gl, targetWidth, targetHeight);
+            
+            if (!highResFBOReference) {
+                highResStatusDiv.textContent = `エラー: この解像度はサポートされていません。`;
+                renderHighResBtn.disabled = false;
+                return;
+            }
+            highResTextureReference = highResFBOReference.texture;
+
+            setTimeout(() => {
+                const selectedColorMode = document.querySelector('input[name="colorMode"]:checked').value;
+                if (selectedColorMode === '1') {
+                    calculateDistanceRange();
+                }
+
+                // 高解像度FBOにレンダリング
+                render('high', highResFBOReference.fbo, targetWidth, targetHeight);
+                
+                // 画面にレンダリングされたテクスチャをコピー
+                renderTextureToScreen(highResTextureReference);
+                
+                highResReady = true;
+                highResScale = scale;
+                
+                highResStatusDiv.textContent = `完了! ${targetWidth}x${targetHeight} で保存可能です。`;
+                saveImageBtn.disabled = false;
+                renderHighResBtn.disabled = false;
+            }, 100); 
+        }
+
         function scheduleHighQualityRender() {
             if (renderTimer) {
                 clearTimeout(renderTimer);
             }
             renderTimer = setTimeout(() => {
-                render('high');
-            }, 50);
+                const selectedColorMode = document.querySelector('input[name="colorMode"]:checked').value;
+                if (selectedColorMode === '1') {
+                    calculateDistanceRange();
+                }
+                
+                // 高画質用FBOがなければ作成
+                if (!highResFBOReference) {
+                    highResFBOReference = createFBO(gl, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+                    highResTextureReference = highResFBOReference.texture;
+                }
+                
+                // 通常画質でのレンダリング
+                render('high', highResFBOReference.fbo, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+
+                // 画面にレンダリングされたテクスチャをコピー
+                renderTextureToScreen(highResTextureReference);
+
+                highResReady = true; 
+                highResScale = 1; 
+                
+                highResStatusDiv.textContent = `通常画質(${LOGICAL_WIDTH}x${LOGICAL_HEIGHT})で保存可能です。`;
+                saveImageBtn.disabled = false;
+            }, 50); 
+        }
+        
+        function updateColorStepsMax() {
+            const maxVal = currentMaxIterations;
+            const currentVal = parseInt(colorStepsSlider.value);
+            
+            colorStepsSlider.max = maxVal;
+            if (currentVal > maxVal) {
+                colorStepsSlider.value = maxVal;
+                currentColorSteps = maxVal;
+                colorStepsValueSpan.textContent = maxVal;
+            } else {
+                currentColorSteps = currentVal;
+            }
+        }
+        
+        function throttledLowQualityRender() {
+            const now = Date.now();
+            if (now - lastRenderTime > THROTTLE_INTERVAL) {
+                // 低解像度用FBOを一時的に作成
+                const lowResFBO = createFBO(gl, PREVIEW_WIDTH, PREVIEW_HEIGHT);
+                if (!lowResFBO) return;
+                
+                // 低解像度FBOにレンダリング
+                render('low', lowResFBO.fbo, PREVIEW_WIDTH, PREVIEW_HEIGHT); 
+                
+                // 低解像度テクスチャを画面に引き伸ばして描画
+                renderTextureToScreen(lowResFBO.texture);
+                
+                // 一時FBOとテクスチャを破棄
+                gl.deleteFramebuffer(lowResFBO.fbo);
+                gl.deleteTexture(lowResFBO.texture);
+                
+                lastRenderTime = now;
+            }
+            highResReady = false; 
+            saveImageBtn.disabled = true; 
+            if (highResFBOReference) {
+                gl.deleteFramebuffer(highResFBOReference.fbo);
+                gl.deleteTexture(highResFBOReference.texture);
+                highResFBOReference = null;
+                highResTextureReference = null;
+            }
+            highResStatusDiv.textContent = `操作中...`;
         }
 
         // --- イベントリスナー ---
         
+        smoothPaletteBtn.addEventListener('click', () => {
+            generatePalette('random_smooth'); 
+            colorPaletteSelect.value = 'random_smooth'; 
+            highResStatusDiv.textContent = `パレット更新: スムースランダムをシャッフル`;
+            scheduleHighQualityRender();
+        });
+        
+        // --- マウス操作 ---
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             isPanning = e.shiftKey;
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
             canvas.style.cursor = 'grabbing';
-            render('low'); // 低画質プレビュー開始
+            throttledLowQualityRender();
         });
-
         canvas.addEventListener('mouseup', () => {
             isDragging = false;
             isPanning = false;
             canvas.style.cursor = 'grab';
-            scheduleHighQualityRender(); // 高画質描画
+            scheduleHighQualityRender();
         });
-
         canvas.addEventListener('mousemove', (e) => {
             if (isDragging) {
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
-
                 if (isPanning) {
-                    // パンのロジック
                     const right = vec3.fromValues(1, 0, 0);
                     const up = vec3.fromValues(0, 1, 0);
                     vec3.transformQuat(right, right, cameraRotation);
@@ -672,117 +999,241 @@ document.addEventListener('DOMContentLoaded', () => {
                     vec3.scaleAndAdd(rotationCenter, rotationCenter, right, panAmountX);
                     vec3.scaleAndAdd(rotationCenter, rotationCenter, up, panAmountY);
                 } else {
-                    // 回転ロジック
                     const xRotation = -dy * ROTATION_SENSITIVITY;
                     const yRotation = -dx * ROTATION_SENSITIVITY;
-                    
                     const camRight = vec3.fromValues(1, 0, 0);
                     const camUp = vec3.fromValues(0, 1, 0);
                     vec3.transformQuat(camRight, camRight, cameraRotation);
                     vec3.transformQuat(camUp, camUp, cameraRotation);
-                    
-                    const newRotationX = quat.create();
-                    quat.setAxisAngle(newRotationX, camRight, xRotation);
-                    const newRotationY = quat.create();
-                    quat.setAxisAngle(newRotationY, camUp, yRotation);
-                    
+                    const newRotationX = quat.create(); quat.setAxisAngle(newRotationX, camRight, xRotation);
+                    const newRotationY = quat.create(); quat.setAxisAngle(newRotationY, camUp, yRotation);
                     quat.multiply(cameraRotation, newRotationX, cameraRotation);
                     quat.multiply(cameraRotation, cameraRotation, newRotationY); 
-                    
-                    // カメラ位置の再計算: カメラ位置 = 回転中心 + (回転後の相対位置)
                     const relativePos = vec3.create();
                     vec3.set(relativePos, 0, 0, cameraDistance);
                     vec3.transformQuat(relativePos, relativePos, cameraRotation);
                     vec3.add(cameraPosition, rotationCenter, relativePos);
                 }
-                
-                render('low'); // Low画質で即時描画
+                throttledLowQualityRender(); 
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
             }
         });
-
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const zoomAmount = Math.log(Math.abs(e.deltaY) + 1) * Math.sign(e.deltaY) * ZOOM_SENSITIVITY;
-            
-            cameraDistance -= zoomAmount;
-            if (cameraDistance < 0.1) cameraDistance = 0.1;
-
-            // カメラ位置の再計算: カメラ位置 = 回転中心 + (回転後の相対位置)
+            const zoomFactor = 1.0 + e.deltaY * ZOOM_SENSITIVITY;
             const relativePos = vec3.create();
-            vec3.set(relativePos, 0, 0, cameraDistance);
-            vec3.transformQuat(relativePos, relativePos, cameraRotation);
+            vec3.subtract(relativePos, cameraPosition, rotationCenter);
+            vec3.scale(relativePos, relativePos, zoomFactor);
             vec3.add(cameraPosition, rotationCenter, relativePos);
-
-            render('low'); 
-            scheduleHighQualityRender();
-        });
-        
-        // --- コントロールのイベントリスナー ---
-        
-        maxRayStepsSlider.addEventListener('input', () => {
-            currentMaxRaySteps = parseInt(maxRayStepsSlider.value);
-            maxRayStepsValueSpan.textContent = currentMaxRaySteps;
-            render('low');
-        });
-        maxRayStepsSlider.addEventListener('change', () => {
+            cameraDistance *= zoomFactor;
+            throttledLowQualityRender(); 
             scheduleHighQualityRender();
         });
 
-        const controlsToUpdate = [powerSelect, colorPaletteSelect, paletteStepsSlider, maxDistanceSlider, lightAngleSlider, fovSlider];
+        // --- タッチ操作 ---
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isTouchDragging = true;
+            throttledLowQualityRender();
+            if (e.touches.length === 1) {
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+                initialPinchDistance = -1; // ピンチをリセット
+            } else if (e.touches.length === 2) {
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                initialPinchDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+                lastTouchX = (touch1.clientX + touch2.clientX) / 2;
+                lastTouchY = (touch1.clientY + touch2.clientY) / 2;
+            }
+        });
 
-        controlsToUpdate.forEach(control => {
-            control.addEventListener('input', () => {
-                if (control.id === 'fovSlider') {
-                    currentFOV = parseInt(control.value);
-                    fovValueSpan.textContent = control.value + '°';
-                } else if (control.id === 'lightAngle') {
-                    lightAngleValueSpan.textContent = control.value + '°';
-                } else if (control.id === 'maxDistance') {
-                    maxDistanceValueSpan.textContent = control.value;
-                } else if (control.id === 'paletteSteps') {
-                    paletteStepsValueSpan.textContent = control.value;
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isTouchDragging) return;
+
+            if (e.touches.length === 1) { // 1本指: 回転
+                const dx = e.touches[0].clientX - lastTouchX;
+                const dy = e.touches[0].clientY - lastTouchY;
+                const xRotation = -dy * ROTATION_SENSITIVITY;
+                const yRotation = -dx * ROTATION_SENSITIVITY;
+                const camRight = vec3.fromValues(1, 0, 0);
+                const camUp = vec3.fromValues(0, 1, 0);
+                vec3.transformQuat(camRight, camRight, cameraRotation);
+                vec3.transformQuat(camUp, camUp, cameraRotation);
+                const newRotationX = quat.create(); quat.setAxisAngle(newRotationX, camRight, xRotation);
+                const newRotationY = quat.create(); quat.setAxisAngle(newRotationY, camUp, yRotation);
+                quat.multiply(cameraRotation, newRotationX, cameraRotation);
+                quat.multiply(cameraRotation, cameraRotation, newRotationY);
+                const relativePos = vec3.create();
+                vec3.set(relativePos, 0, 0, cameraDistance);
+                vec3.transformQuat(relativePos, relativePos, cameraRotation);
+                vec3.add(cameraPosition, rotationCenter, relativePos);
+                lastTouchX = e.touches[0].clientX;
+                lastTouchY = e.touches[0].clientY;
+            } else if (e.touches.length === 2) { // 2本指: ズームと平行移動
+                const touch1 = e.touches[0];
+                const touch2 = e.touches[1];
+                
+                // ピンチによるズーム
+                const currentPinchDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+                if (initialPinchDistance !== -1) {
+                    const zoomDelta = initialPinchDistance - currentPinchDistance;
+                    const zoomFactor = 1.0 + zoomDelta * ZOOM_SENSITIVITY;
+                    const relativePos = vec3.create();
+                    vec3.subtract(relativePos, cameraPosition, rotationCenter);
+                    vec3.scale(relativePos, relativePos, zoomFactor);
+                    vec3.add(cameraPosition, rotationCenter, relativePos);
+                    cameraDistance *= zoomFactor;
                 }
-                render('low');
-            });
-            control.addEventListener('change', () => {
+                initialPinchDistance = currentPinchDistance;
+
+                // 2本指による平行移動
+                const currentTouchX = (touch1.clientX + touch2.clientX) / 2;
+                const currentTouchY = (touch1.clientY + touch2.clientY) / 2;
+                const dx = currentTouchX - lastTouchX;
+                const dy = currentTouchY - lastTouchY;
+                const right = vec3.fromValues(1, 0, 0);
+                const up = vec3.fromValues(0, 1, 0);
+                vec3.transformQuat(right, right, cameraRotation);
+                vec3.transformQuat(up, up, cameraRotation);
+                const panAmountX = -dx * PAN_SENSITIVITY;
+                const panAmountY = dy * PAN_SENSITIVITY;
+                vec3.scaleAndAdd(cameraPosition, cameraPosition, right, panAmountX);
+                vec3.scaleAndAdd(cameraPosition, cameraPosition, up, panAmountY);
+                vec3.scaleAndAdd(rotationCenter, rotationCenter, right, panAmountX);
+                vec3.scaleAndAdd(rotationCenter, rotationCenter, up, panAmountY);
+                lastTouchX = currentTouchX;
+                lastTouchY = currentTouchY;
+            }
+            throttledLowQualityRender();
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            isTouchDragging = false;
+            initialPinchDistance = -1;
+            scheduleHighQualityRender();
+        });
+        
+        // --- スライダー/セレクトボックスのイベント ---
+        maxIterationsSlider.addEventListener('input', (e) => {
+            currentMaxIterations = parseInt(e.target.value);
+            maxIterationsValueSpan.textContent = currentMaxIterations;
+            updateColorStepsMax();
+            throttledLowQualityRender();
+        });
+        powerSelect.addEventListener('change', () => scheduleHighQualityRender());
+        fovSlider.addEventListener('input', (e) => {
+            currentFOV = parseInt(e.target.value);
+            fovValue.textContent = e.target.value + '°';
+            throttledLowQualityRender();
+        });
+        fovSlider.addEventListener('change', () => { // マウスやタッチ操作が終了した時に高画質レンダリング
+            scheduleHighQualityRender();
+        });
+        maxDistanceSlider.addEventListener('input', (e) => {
+            maxDistanceValueSpan.textContent = parseFloat(e.target.value).toFixed(1);
+            throttledLowQualityRender();
+        });
+        maxDistanceSlider.addEventListener('change', () => scheduleHighQualityRender());
+        lightAngleSlider.addEventListener('input', (e) => {
+            lightAngleValueSpan.textContent = e.target.value + '°';
+            throttledLowQualityRender();
+        });
+        lightAngleSlider.addEventListener('change', () => scheduleHighQualityRender());
+        colorPaletteSelect.addEventListener('change', (e) => {
+            generatePalette(e.target.value);
+            scheduleHighQualityRender();
+        });
+        colorStepsSlider.addEventListener('input', (e) => {
+            currentColorSteps = parseInt(e.target.value);
+            colorStepsValueSpan.textContent = currentColorSteps;
+            throttledLowQualityRender();
+        });
+        colorStepsSlider.addEventListener('change', () => scheduleHighQualityRender());
+        colorModeRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
                 scheduleHighQualityRender();
             });
         });
-
-        resetBtn.addEventListener('click', () => {
-            vec3.set(cameraPosition, 0, 0, 4);
-            quat.identity(cameraRotation);
-            vec3.set(rotationCenter, 0, 0, 0);
-            cameraDistance = 4;
-            currentFOV = 45;
-            fovSlider.value = 45;
-            fovValueSpan.textContent = '45°';
-            lightAngleSlider.value = 30; // リセット時も30度
-            lightAngleValueSpan.textContent = '30°';
-            render('high');
+        
+        // --- ボタンのイベント ---
+        renderHighResBtn.addEventListener('click', () => {
+            const scale = parseInt(highResScaleSelect.value);
+            renderToHighResAndFlagReady(scale);
         });
 
         saveImageBtn.addEventListener('click', () => {
-            render('high'); 
-            const dataURL = canvas.toDataURL('image/png');
+            if (!highResFBOReference) {
+                alert("高画質レンダリングが完了していません。");
+                return;
+            }
+            if (!highResReady) {
+                 alert("レンダリングが完了するまでお待ちください。");
+                 return;
+            }
+            
+            const currentWidth = LOGICAL_WIDTH * highResScale;
+            const currentHeight = LOGICAL_HEIGHT * highResScale;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = currentWidth;
+            tempCanvas.height = currentHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (!tempCtx) {
+                alert("2Dコンテキストが取得できないため、画像保存に失敗しました。");
+                return;
+            }
+
+            const pixels = new Uint8Array(currentWidth * currentHeight * 4);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, highResFBOReference.fbo);
+            gl.readPixels(0, 0, currentWidth, currentHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            
+            const imageData = tempCtx.createImageData(currentWidth, currentHeight);
+            imageData.data.set(pixels); 
+            tempCtx.putImageData(imageData, 0, 0);
+
+            const dataURL = tempCanvas.toDataURL('image/png');
             const link = document.createElement('a');
-            link.download = 'mandelbulb_fractal.png';
+            link.download = `mandelbulb_${currentWidth}x${currentHeight}_p${powerSelect.value.replace('.', '_')}.png`;
             link.href = dataURL;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         });
 
-        // --- 初期描画ロジック ---
-        // ランダムパレットテクスチャのデータ設定
-        const currentRandomPalette = generateSmoothRandomPalette();
-        gl.bindTexture(gl.TEXTURE_2D, randomPaletteTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 256, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, currentRandomPalette);
-        
-        // ★ 初期画面表示を確実にするためのHigh品質描画
-        render('high');
+        resetBtn.addEventListener('click', () => {
+            cameraPosition = vec3.fromValues(0, 0, 4);
+            cameraRotation = quat.create();
+            rotationCenter = vec3.fromValues(0, 0, 0); 
+            cameraDistance = 4;
+            
+            fovSlider.value = 45;
+            fovValue.textContent = '45°';
+            maxDistanceSlider.value = 5.0;
+            maxDistanceValue.textContent = '5.0';
+            
+            // FBOを明示的にクリアし、再作成
+            if (highResFBOReference) {
+                gl.deleteFramebuffer(highResFBOReference.fbo);
+                gl.deleteTexture(highResFBOReference.texture);
+                highResFBOReference = null;
+                highResTextureReference = null;
+            }
+
+            // 低画質レンダリングをスキップし、直接高画質レンダリングをスケジュール
+            scheduleHighQualityRender();
+            highResStatusDiv.textContent = 'カメラ位置がリセットされました。';
+        });
+
+        // --- 初期化と描画 ---
+        generatePalette('rainbow');
+        scheduleHighQualityRender();
+    } else {
+        console.error("WebGLが初期化できませんでした。");
     }
 });
     </script>
