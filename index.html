@@ -650,7 +650,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 指定した色を滑らかに補間する汎用関数
         function generateLinearPalette(colors) {
-            const palette = new Uint8Array(PALETTE_SIZE * 4);
+            const paletteData = new Uint8Array(PALETTE_SIZE * 4);
             const numSegments = colors.length - 1;
             for (let i = 0; i < PALETTE_SIZE; i++) {
                 const t = i / (PALETTE_SIZE - 1);
@@ -664,12 +664,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const g = c1[1] * (1 - segmentT) + c2[1] * segmentT;
                 const b = c1[2] * (1 - segmentT) + c2[2] * segmentT;
                 
-                palette[i * 4] = Math.round(r);
-                palette[i * 4 + 1] = Math.round(g);
-                palette[i * 4 + 2] = Math.round(b);
-                palette[i * 4 + 3] = 255;
+                paletteData[i * 4] = Math.round(r);
+                paletteData[i * 4 + 1] = Math.round(g);
+                paletteData[i * 4 + 2] = Math.round(b);
+                paletteData[i * 4 + 3] = 255;
             }
-            return palette;
+            return paletteData;
         }
 
         // プリセットパレットを生成する関数
@@ -717,7 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const [r, g, b] = hsvToRgbJs(h, 0.9, 0.9);
                         paletteData[i * 4] = r;
                         paletteData[i * 4 + 1] = g;
-                        palette[i * 4 + 2] = b;
+                        paletteData[i * 4 + 2] = b;
                         paletteData[i * 4 + 3] = 255;
                     }
                     break;
@@ -727,7 +727,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // メインの描画関数
-        function render(quality = 'high', targetFBO = null, targetWidth, targetHeight) {
+        function render(quality = 'high', targetFBO = null, targetWidth, targetHeight, highResScale = 1) {
             const isLow = (quality === 'low');
             
             gl.useProgram(fractalProgram); 
@@ -740,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isLow) {
                 maxIterations = Math.max(20, Math.floor(currentMaxIterations / 4));
             } else {
-                maxIterations = currentMaxIterations;
+                maxIterations = currentMaxIterations * highResScale;
             }
             
             gl.uniform2f(resolutionLocation, targetWidth, targetHeight);
@@ -871,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 // 高解像度FBOにレンダリング
-                render('high', highResFBOReference.fbo, targetWidth, targetHeight);
+                render('high', highResFBOReference.fbo, targetWidth, targetHeight, scale);
                 
                 // 画面にレンダリングされたテクスチャをコピー
                 renderTextureToScreen(highResTextureReference);
@@ -902,7 +902,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // 通常画質でのレンダリング
-                render('high', highResFBOReference.fbo, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+                render('high', highResFBOReference.fbo, LOGICAL_WIDTH, LOGICAL_HEIGHT, 1);
 
                 // 画面にレンダリングされたテクスチャをコピー
                 renderTextureToScreen(highResTextureReference);
